@@ -71,7 +71,7 @@ void ADS126X::startADC1(uint8_t pos_pin, uint8_t neg_pin) {
 void ADS126X::stopADC1() {
   if (start_used) {
     _ads126x_write_pin_low(start_pin);
-  } 
+  }
   else ADS126X::sendCommand(ADS126X_STOP1);
 }
 
@@ -81,7 +81,7 @@ void ADS126X::startADC2(uint8_t pos_pin, uint8_t neg_pin) {
     REGISTER.ADC2MUX.bit.MUXN = neg_pin;
     REGISTER.ADC2MUX.bit.MUXP = pos_pin;
     ADS126X::writeRegister(ADS126X_ADC2MUX); // replace on ads126x
-  } 
+  }
   else ADS126X::sendCommand(ADS126X_START2);
 }
 
@@ -409,6 +409,10 @@ void ADS126X::setDelay(uint8_t del) {
   ADS126X::writeRegister(ADS126X_MODE0);
 }
 
+void ADS126X::setRefReversal(uint8_t refrev) {
+  REGISTER.MODE0.bit.REFREV = refrev;
+  ADS126X::writeRegister(ADS126X_MODE0);
+}
 /*!< MODE1 register       */
 
 void ADS126X::setFilter(uint8_t filter) {
@@ -465,6 +469,15 @@ void ADS126X::setReference(uint8_t negativeReference, uint8_t positiveReference)
     ADS126X::writeRegister(ADS126X_REFMUX);
 }
 
+uint8_t ADS126X::getRefMuxP() {
+  ADS126X::readRegister(ADS126X_REFMUX); // read register
+  return REGISTER.REFMUX.bit.RMUXP;
+}
+
+uint8_t ADS126X::getRefMuxN() {
+  ADS126X::readRegister(ADS126X_REFMUX); // read register
+  return REGISTER.REFMUX.bit.RMUXN;
+}
 /*!< GPIO commands        */
 
 void ADS126X::gpioConnect(uint8_t pin) {

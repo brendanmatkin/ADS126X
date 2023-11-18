@@ -78,6 +78,7 @@ class ADS126X {
     void setPulseMode(void);
     void setChopMode(uint8_t mode);
     void setDelay(uint8_t del);
+    void setRefReversal(uint8_t refrev);
 
     // MODE1 functions
     void setFilter(uint8_t filter);
@@ -93,6 +94,8 @@ class ADS126X {
     void setRate(uint8_t rate);
 
     void setReference(uint8_t negativeReference, uint8_t positiveReference);
+    uint8_t getRefMuxN(void);
+    uint8_t getRefMuxP(void);
 
     // GPIO functions
     void gpioConnect(uint8_t pin);
