@@ -82,7 +82,7 @@ void ADS126X::startADC2(uint8_t pos_pin, uint8_t neg_pin) {
     REGISTER.ADC2MUX.bit.MUXP = pos_pin;
     ADS126X::writeRegister(ADS126X_ADC2MUX); // replace on ads126x
   }
-  else ADS126X::sendCommand(ADS126X_START2);
+  ADS126X::sendCommand(ADS126X_START2);
 }
 
 void ADS126X::stopADC2() {
@@ -315,6 +315,10 @@ void ADS126X::enableInternalReference() {
 	ADS126X::writeRegister(ADS126X_POWER);
 }
 
+void ADS126X::disableInternalReference() {
+	REGISTER.POWER.bit.INTREF = 0;
+	ADS126X::writeRegister(ADS126X_POWER);
+}
 /*!< INTERFACE register     */
 
 void ADS126X::disableCheck() {
@@ -456,17 +460,48 @@ uint8_t ADS126X::getGain() {
   return REGISTER.MODE2.bit.GAIN;
 }
 
+void ADS126X::setGain2(uint8_t gain) {
+  REGISTER.ADC2CFG.bit.GAIN2 = gain;
+  ADS126X::writeRegister(ADS126X_ADC2CFG);
+}
+
+uint8_t ADS126X::getGain2() {
+  return REGISTER.ADC2CFG.bit.GAIN2;
+}
+
 void ADS126X::setRate(uint8_t rate) {
   REGISTER.MODE2.bit.DR = rate;
   ADS126X::writeRegister(ADS126X_MODE2);
 }
 
+uint8_t ADS126X::getRate() {
+  return REGISTER.MODE2.bit.DR;
+}
+
+void ADS126X::setRate2(uint8_t rate) {
+  REGISTER.ADC2CFG.bit.DR2 = rate;
+  ADS126X::writeRegister(ADS126X_ADC2CFG);
+}
+
+uint8_t ADS126X::getRate2() {
+  return REGISTER.ADC2CFG.bit.DR2;
+}
 
 void ADS126X::setReference(uint8_t negativeReference, uint8_t positiveReference)
 {
     REGISTER.REFMUX.bit.RMUXN = negativeReference;
     REGISTER.REFMUX.bit.RMUXP = positiveReference;
     ADS126X::writeRegister(ADS126X_REFMUX);
+}
+
+void ADS126X::setReference2(uint8_t adc2RefConfig)
+{
+    REGISTER.ADC2CFG.bit.REF2 = adc2RefConfig;
+    ADS126X::writeRegister(ADS126X_ADC2CFG);
+}
+
+uint8_t ADS126X::getReference2() {
+  return REGISTER.ADC2CFG.bit.REF2;
 }
 
 uint8_t ADS126X::getRefMuxP() {

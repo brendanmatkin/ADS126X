@@ -240,7 +240,7 @@ extern "C" {
 #define ADS126X_ADC2_REF_AIN0_AIN1 0b001
 #define ADS126X_ADC2_REF_AIN2_AIN3 0b010
 #define ADS126X_ADC2_REF_AIN4_AIN5 0b011
-#define ADS126X_ADC2_REF_V        0b111
+#define ADS126X_ADC2_REF_AVDD_AVSS 0b100
 #define ADS126X_ADC2_GAIN_1       0b000 // gain of ADC2
 #define ADS126X_ADC2_GAIN_2       0b001
 #define ADS126X_ADC2_GAIN_4       0b010
@@ -453,7 +453,7 @@ typedef union { // page 106
 
 typedef union { // page 106
   struct {
-    uint8_t FSC2:8;           /*!< bit 0.. 7 ADC2 Offset Calibration              */
+    uint8_t FSC2:8;           /*!< bit 0.. 7 ADC2 Full-Scale Calibration          */
   } bit;
   uint8_t reg;
 } ADS126X_ADC2FSC_Type;

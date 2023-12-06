@@ -92,6 +92,17 @@ class ADS126X {
     void setGain(uint8_t gain);
     uint8_t getGain(void);
     void setRate(uint8_t rate);
+    uint8_t getRate(void);
+
+
+    // ADC2CFG functions
+    void setGain2(uint8_t gain);
+    uint8_t getGain2();
+    void setReference2(uint8_t adc2RefConfig);
+    uint8_t getReference2();
+    void setRate2(uint8_t rate);
+    uint8_t getRate2();
+
 
     void setReference(uint8_t negativeReference, uint8_t positiveReference);
     uint8_t getRefMuxN(void);
