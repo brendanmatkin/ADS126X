@@ -162,7 +162,7 @@ int32_t ADS126X::readADC2() {
       uint32_t DATA3:8; // bits 0.. 7
       uint32_t DATA2:8; // bits 8.. 15
       uint32_t DATA1:8; // bits 16.. 23
-      uint32_t :8;      // bits 24.. 31
+      uint32_t DATA0:8; // bits 24.. 31
     } bit;
     uint32_t reg;
   } ADC_BYTES;
@@ -190,6 +190,7 @@ int32_t ADS126X::readADC2() {
    ADC_BYTES.bit.DATA1 = buff[j]; j++;
    ADC_BYTES.bit.DATA2 = buff[j]; j++;
    ADC_BYTES.bit.DATA3 = buff[j]; j++;
+   ADC_BYTES.bit.DATA0 = (ADC_BYTES.bit.DATA1 & 0x80) ? 0xFF : 0x00;  // filler based on MSB sign bit
    j++; // skip pad byte
 
   if(REGISTER.INTERFACE.bit.CRC==ADS126X_CHECKSUM) {
