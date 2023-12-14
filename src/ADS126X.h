@@ -94,6 +94,15 @@ class ADS126X {
     void setRate(uint8_t rate);
     uint8_t getRate(void);
 
+    // TDAC functions
+    void setTdacpMag(uint8_t);
+    void setTdacnMag(uint8_t);
+    void setTdacpState(uint8_t);
+    void setTdacnState(uint8_t);
+    uint8_t getTdacpMag();
+    uint8_t getTdacnMag();
+    uint8_t getTdacpState();
+    uint8_t getTdacnState();
 
     // ADC2CFG functions
     void setGain2(uint8_t gain);

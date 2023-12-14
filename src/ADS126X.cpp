@@ -497,8 +497,8 @@ void ADS126X::setReference(uint8_t negativeReference, uint8_t positiveReference)
 
 void ADS126X::setReference2(uint8_t adc2RefConfig)
 {
-    REGISTER.ADC2CFG.bit.REF2 = adc2RefConfig;
-    ADS126X::writeRegister(ADS126X_ADC2CFG);
+  REGISTER.ADC2CFG.bit.REF2 = adc2RefConfig;
+  ADS126X::writeRegister(ADS126X_ADC2CFG);
 }
 
 uint8_t ADS126X::getReference2() {
@@ -514,6 +514,47 @@ uint8_t ADS126X::getRefMuxN() {
   ADS126X::readRegister(ADS126X_REFMUX); // read register
   return REGISTER.REFMUX.bit.RMUXN;
 }
+
+void ADS126X::setTdacpMag(uint8_t magnitude) {
+  REGISTER.TDACP.bit.MAGP = magnitude;
+  ADS126X::writeRegister(ADS126X_TDACP);
+}
+
+void ADS126X::setTdacnMag(uint8_t magnitude) {
+  REGISTER.TDACN.bit.MAGN = magnitude;
+  ADS126X::writeRegister(ADS126X_TDACN);
+}
+
+void ADS126X::setTdacpState(uint8_t state) {
+  REGISTER.TDACP.bit.OUTP = state;
+  ADS126X::writeRegister(ADS126X_TDACP);
+}
+
+void ADS126X::setTdacnState(uint8_t state) {
+  REGISTER.TDACN.bit.OUTN = state;
+  ADS126X::writeRegister(ADS126X_TDACN);
+}
+
+uint8_t ADS126X::getTdacpMag() {
+  ADS126X::readRegister(ADS126X_TDACP);
+  return REGISTER.TDACP.bit.MAGP;
+}
+
+uint8_t ADS126X::getTdacnMag() {
+  ADS126X::readRegister(ADS126X_TDACN);
+  return REGISTER.TDACN.bit.MAGN;
+}
+
+uint8_t ADS126X::getTdacpState() {
+  ADS126X::readRegister(ADS126X_TDACP);
+  return REGISTER.TDACP.bit.OUTP;
+}
+
+uint8_t ADS126X::getTdacnState() {
+  ADS126X::readRegister(ADS126X_TDACN);
+  return REGISTER.TDACN.bit.OUTN;
+}
+
 /*!< GPIO commands        */
 
 void ADS126X::gpioConnect(uint8_t pin) {
