@@ -23,6 +23,8 @@ void ADS126X::begin() {
   */
   _ads126x_spi_setup();
   ADS126X::reset(); // reset the board, just in case. This also reads all registers
+  table32 = getTable32();
+  table33 = getTable33();
 }
 
 void ADS126X::setStartPin(uint8_t pin) {
@@ -71,7 +73,7 @@ void ADS126X::startADC1(uint8_t pos_pin, uint8_t neg_pin) {
 void ADS126X::stopADC1() {
   if (start_used) {
     _ads126x_write_pin_low(start_pin);
-  } 
+  }
   else ADS126X::sendCommand(ADS126X_STOP1);
 }
 
@@ -81,8 +83,8 @@ void ADS126X::startADC2(uint8_t pos_pin, uint8_t neg_pin) {
     REGISTER.ADC2MUX.bit.MUXN = neg_pin;
     REGISTER.ADC2MUX.bit.MUXP = pos_pin;
     ADS126X::writeRegister(ADS126X_ADC2MUX); // replace on ads126x
-  } 
-  else ADS126X::sendCommand(ADS126X_START2);
+  }
+  ADS126X::sendCommand(ADS126X_START2);
 }
 
 void ADS126X::stopADC2() {
@@ -162,7 +164,7 @@ int32_t ADS126X::readADC2() {
       uint32_t DATA3:8; // bits 0.. 7
       uint32_t DATA2:8; // bits 8.. 15
       uint32_t DATA1:8; // bits 16.. 23
-      uint32_t :8;      // bits 24.. 31
+      uint32_t DATA0:8; // bits 24.. 31
     } bit;
     uint32_t reg;
   } ADC_BYTES;
@@ -190,6 +192,7 @@ int32_t ADS126X::readADC2() {
    ADC_BYTES.bit.DATA1 = buff[j]; j++;
    ADC_BYTES.bit.DATA2 = buff[j]; j++;
    ADC_BYTES.bit.DATA3 = buff[j]; j++;
+   ADC_BYTES.bit.DATA0 = (ADC_BYTES.bit.DATA1 & 0x80) ? 0xFF : 0x00;  // filler based on MSB sign bit
    j++; // skip pad byte
 
   if(REGISTER.INTERFACE.bit.CRC==ADS126X_CHECKSUM) {
@@ -205,50 +208,96 @@ int32_t ADS126X::readADC2() {
   return ADC_BYTES.reg;
 }
 
+void ADS126X::resetCalRegs1() {
+  REGISTER.OFCAL0.reg = 0x00;
+  REGISTER.OFCAL1.reg = 0x00;
+  REGISTER.OFCAL2.reg = 0x00;
+  REGISTER.FSCAL0.reg = 0x00;
+  REGISTER.FSCAL1.reg = 0x00;
+  REGISTER.FSCAL2.reg = 0x40;
+  ADS126X::writeRegisters(ADS126X_OFCAL0, 6);
+}
+
+void ADS126X::resetCalRegs2() {
+  REGISTER.ADC2OFC0.reg = 0x00;
+  REGISTER.ADC2OFC1.reg = 0x00;
+  REGISTER.ADC2FSC0.reg = 0x00;
+  REGISTER.ADC2FSC1.reg = 0x40;
+  ADS126X::writeRegisters(ADS126X_ADC2OFC0, 4);
+}
+
 void ADS126X::calibrateSysOffsetADC1(uint8_t shorted1,uint8_t shorted2) {
+
+  uint16_t calTime1 = getCalTime1();
+  if (calTime1 == 0) calTime1 = 1000; // if the delay is 0, make it 1000
+  // set the pins to the shorted pins (or any pins))
   // connect the pins internally
   REGISTER.INPMUX.bit.MUXN = shorted1;
   REGISTER.INPMUX.bit.MUXP = shorted2;
   ADS126X::writeRegister(ADS126X_INPMUX);
-  _ads126x_delay(10); // let signal sort of settle
-  ADS126X::sendCommand(ADS126X_SYOCAL1);
-  _ads126x_delay(50); // delay to allow time for reads
+  _ads126x_delay(ADS126X_PRE_CAL_WAIT_TIME); // let signal sort of settle
+  ADS126X::sendCalCommand(ADS126X_SYOCAL1, calTime1);
+}
+
+uint8_t ADS126X::getSPS() {
+  return readRegister(ADS126X_MODE2) & 0x0F;
+}
+
+uint8_t ADS126X::getSPS2() {
+  return readRegister(ADS126X_ADC2CFG) >> 6;
+}
+
+uint8_t ADS126X::getFIL() {
+  return readRegister(ADS126X_MODE2) >> 5;
+}
+
+uint16_t ADS126X::getCalTime1() {
+  return findDelayTime(table32, getSPS(), getFIL());
+}
+
+uint16_t ADS126X::getCalTime2() {
+  return findDelayTime(table33, getSPS2(), FIL_DONT_CARE);
 }
 
 void ADS126X::calibrateGainADC1(uint8_t vcc_pin,uint8_t gnd_pin) {
+  uint16_t calTime1 = getCalTime1();
+  if (calTime1 == 0) calTime1 = 1000; // if the delay is 0, make it 1000
   REGISTER.INPMUX.bit.MUXN = gnd_pin;
   REGISTER.INPMUX.bit.MUXP = vcc_pin;
   ADS126X::writeRegister(ADS126X_INPMUX);
-  _ads126x_delay(100); // delay to allow signal to settle
-  ADS126X::sendCommand(ADS126X_SYGCAL1);
-  _ads126x_delay(50); // delay to allow time for reads
+  _ads126x_delay(ADS126X_PRE_CAL_WAIT_TIME); // delay to allow signal to settle
+  ADS126X::sendCalCommand(ADS126X_SYGCAL1, calTime1);
 }
 
 void ADS126X::calibrateSelfOffsetADC1() {
+  uint16_t calTime1 = getCalTime1();
+  if (calTime1 == 0) calTime1 = 1000; // if the delay is 0, make it 1000
   REGISTER.INPMUX.bit.MUXN = ADS126X_FLOAT;
   REGISTER.INPMUX.bit.MUXP = ADS126X_FLOAT;
   ADS126X::writeRegister(ADS126X_INPMUX);
-  _ads126x_delay(10);
-  ADS126X::sendCommand(ADS126X_SFOCAL1);
+  _ads126x_delay(ADS126X_PRE_CAL_WAIT_TIME);
+  ADS126X::sendCalCommand(ADS126X_SFOCAL1, calTime1);
   _ads126x_delay(50);
 }
 
 void ADS126X::calibrateSysOffsetADC2(uint8_t shorted1,uint8_t shorted2) {
+  uint16_t calTime2 = getCalTime2();
+  if (calTime2 == 0) calTime2 = 1742; // if the delay is 0, make it 1000
   REGISTER.ADC2MUX.bit.MUXN = shorted1;
   REGISTER.ADC2MUX.bit.MUXP = shorted2;
   ADS126X::writeRegister(ADS126X_ADC2MUX);
-  _ads126x_delay(10);
-  ADS126X::sendCommand(ADS126X_SYOCAL2);
-  _ads126x_delay(50);
+  _ads126x_delay(ADS126X_PRE_CAL_WAIT_TIME);
+  ADS126X::sendCalCommand(ADS126X_SYOCAL2, calTime2);
 }
 
 void ADS126X::calibrateGainADC2(uint8_t vcc_pin,uint8_t gnd_pin) {
+  uint16_t calTime2 = getCalTime2();
+  if (calTime2 == 0) calTime2 = 1742; // if the delay is 0, make it 1000
   REGISTER.ADC2MUX.bit.MUXN = gnd_pin;
   REGISTER.ADC2MUX.bit.MUXP = vcc_pin;
   ADS126X::writeRegister(ADS126X_ADC2MUX);
-  _ads126x_delay(100);
-  ADS126X::sendCommand(ADS126X_SYGCAL2);
-  _ads126x_delay(50);
+  _ads126x_delay(ADS126X_PRE_CAL_WAIT_TIME);
+  ADS126X::sendCalCommand(ADS126X_SYGCAL2, calTime2);
 }
 
 void ADS126X::calibrateSelfOffsetADC2() {
@@ -315,6 +364,10 @@ void ADS126X::enableInternalReference() {
 	ADS126X::writeRegister(ADS126X_POWER);
 }
 
+void ADS126X::disableInternalReference() {
+	REGISTER.POWER.bit.INTREF = 0;
+	ADS126X::writeRegister(ADS126X_POWER);
+}
 /*!< INTERFACE register     */
 
 void ADS126X::disableCheck() {
@@ -409,6 +462,10 @@ void ADS126X::setDelay(uint8_t del) {
   ADS126X::writeRegister(ADS126X_MODE0);
 }
 
+void ADS126X::setRefReversal(uint8_t refrev) {
+  REGISTER.MODE0.bit.REFREV = refrev;
+  ADS126X::writeRegister(ADS126X_MODE0);
+}
 /*!< MODE1 register       */
 
 void ADS126X::setFilter(uint8_t filter) {
@@ -452,17 +509,98 @@ uint8_t ADS126X::getGain() {
   return REGISTER.MODE2.bit.GAIN;
 }
 
+void ADS126X::setGain2(uint8_t gain) {
+  REGISTER.ADC2CFG.bit.GAIN2 = gain;
+  ADS126X::writeRegister(ADS126X_ADC2CFG);
+}
+
+uint8_t ADS126X::getGain2() {
+  return REGISTER.ADC2CFG.bit.GAIN2;
+}
+
 void ADS126X::setRate(uint8_t rate) {
   REGISTER.MODE2.bit.DR = rate;
   ADS126X::writeRegister(ADS126X_MODE2);
 }
 
+uint8_t ADS126X::getRate() {
+  return REGISTER.MODE2.bit.DR;
+}
+
+void ADS126X::setRate2(uint8_t rate) {
+  REGISTER.ADC2CFG.bit.DR2 = rate;
+  ADS126X::writeRegister(ADS126X_ADC2CFG);
+}
+
+uint8_t ADS126X::getRate2() {
+  return REGISTER.ADC2CFG.bit.DR2;
+}
 
 void ADS126X::setReference(uint8_t negativeReference, uint8_t positiveReference)
 {
     REGISTER.REFMUX.bit.RMUXN = negativeReference;
     REGISTER.REFMUX.bit.RMUXP = positiveReference;
     ADS126X::writeRegister(ADS126X_REFMUX);
+}
+
+void ADS126X::setReference2(uint8_t adc2RefConfig)
+{
+  REGISTER.ADC2CFG.bit.REF2 = adc2RefConfig;
+  ADS126X::writeRegister(ADS126X_ADC2CFG);
+}
+
+uint8_t ADS126X::getReference2() {
+  return REGISTER.ADC2CFG.bit.REF2;
+}
+
+uint8_t ADS126X::getRefMuxP() {
+  ADS126X::readRegister(ADS126X_REFMUX); // read register
+  return REGISTER.REFMUX.bit.RMUXP;
+}
+
+uint8_t ADS126X::getRefMuxN() {
+  ADS126X::readRegister(ADS126X_REFMUX); // read register
+  return REGISTER.REFMUX.bit.RMUXN;
+}
+
+void ADS126X::setTdacpMag(uint8_t magnitude) {
+  REGISTER.TDACP.bit.MAGP = magnitude;
+  ADS126X::writeRegister(ADS126X_TDACP);
+}
+
+void ADS126X::setTdacnMag(uint8_t magnitude) {
+  REGISTER.TDACN.bit.MAGN = magnitude;
+  ADS126X::writeRegister(ADS126X_TDACN);
+}
+
+void ADS126X::setTdacpState(uint8_t state) {
+  REGISTER.TDACP.bit.OUTP = state;
+  ADS126X::writeRegister(ADS126X_TDACP);
+}
+
+void ADS126X::setTdacnState(uint8_t state) {
+  REGISTER.TDACN.bit.OUTN = state;
+  ADS126X::writeRegister(ADS126X_TDACN);
+}
+
+uint8_t ADS126X::getTdacpMag() {
+  ADS126X::readRegister(ADS126X_TDACP);
+  return REGISTER.TDACP.bit.MAGP;
+}
+
+uint8_t ADS126X::getTdacnMag() {
+  ADS126X::readRegister(ADS126X_TDACN);
+  return REGISTER.TDACN.bit.MAGN;
+}
+
+uint8_t ADS126X::getTdacpState() {
+  ADS126X::readRegister(ADS126X_TDACP);
+  return REGISTER.TDACP.bit.OUTP;
+}
+
+uint8_t ADS126X::getTdacnState() {
+  ADS126X::readRegister(ADS126X_TDACN);
+  return REGISTER.TDACN.bit.OUTN;
 }
 
 /*!< GPIO commands        */
@@ -509,6 +647,14 @@ void ADS126X::sendCommand(uint8_t command) {
   if(cs_used) _ads126x_write_pin_high(cs_pin);
 }
 
+void ADS126X::sendCalCommand(uint8_t command, uint16_t wait_time) {
+  if(cs_used) _ads126x_write_pin_low(cs_pin);
+  uint8_t buff[1] = {command};
+  _ads126x_spi_rw(buff,1);
+  _ads126x_delay(wait_time);
+  if(cs_used) _ads126x_write_pin_high(cs_pin);
+}
+
 void ADS126X::writeRegisters(uint8_t start_reg,uint8_t num) { // page 87
   if(cs_used) _ads126x_write_pin_low(cs_pin);
   uint8_t buff[50] = {0}; // plenty of room, all zeros
@@ -525,6 +671,106 @@ void ADS126X::writeRegisters(uint8_t start_reg,uint8_t num) { // page 87
   _ads126x_spi_rw(buff,num+2);
 
   if(cs_used) _ads126x_write_pin_high(cs_pin);
+}
+
+
+// Table 32, 33 for system calibration time
+sps_map_t ADS126X::getTable32() {
+  sps_map_t table32;
+  table32[ADS126X_RATE_2_5][ADS126X_SINC1] =    6801;
+  table32[ADS126X_RATE_2_5][ADS126X_SINC2] =    7601;
+  table32[ADS126X_RATE_2_5][ADS126X_SINC3] =    8401;
+  table32[ADS126X_RATE_2_5][ADS126X_SINC4] =    9201;
+  table32[ADS126X_RATE_2_5][ADS126X_FIR] =      6805;
+  table32[ADS126X_RATE_5][ADS126X_SINC1] =      3401;
+  table32[ADS126X_RATE_5][ADS126X_SINC2] =      3801;
+  table32[ADS126X_RATE_5][ADS126X_SINC3] =      4201;
+  table32[ADS126X_RATE_5][ADS126X_SINC4] =      4601;
+  table32[ADS126X_RATE_5][ADS126X_FIR] =        3405;
+  table32[ADS126X_RATE_10][ADS126X_SINC1] =     3401;
+  table32[ADS126X_RATE_10][ADS126X_SINC2] =     3801;
+  table32[ADS126X_RATE_10][ADS126X_SINC3] =     4201;
+  table32[ADS126X_RATE_10][ADS126X_SINC4] =     4601;
+  table32[ADS126X_RATE_10][ADS126X_FIR] =       3405;
+  table32[ADS126X_RATE_16_6][ADS126X_SINC1] =   1021;
+  table32[ADS126X_RATE_16_6][ADS126X_SINC2] =   1141;
+  table32[ADS126X_RATE_16_6][ADS126X_SINC3] =   1261;
+  table32[ADS126X_RATE_16_6][ADS126X_SINC4] =   1381;
+  table32[ADS126X_RATE_20][ADS126X_SINC1] =     851;
+  table32[ADS126X_RATE_20][ADS126X_SINC2] =     951;
+  table32[ADS126X_RATE_20][ADS126X_SINC3] =     1051;
+  table32[ADS126X_RATE_20][ADS126X_SINC4] =     1151;
+  table32[ADS126X_RATE_50][ADS126X_SINC1] =     341;
+  table32[ADS126X_RATE_50][ADS126X_SINC2] =     381;
+  table32[ADS126X_RATE_50][ADS126X_SINC3] =     421;
+  table32[ADS126X_RATE_50][ADS126X_SINC4] =     461;
+  table32[ADS126X_RATE_60][ADS126X_SINC1] =     285;
+  table32[ADS126X_RATE_60][ADS126X_SINC2] =     318;
+  table32[ADS126X_RATE_60][ADS126X_SINC3] =     351;
+  table32[ADS126X_RATE_60][ADS126X_SINC4] =     385;
+  table32[ADS126X_RATE_100][ADS126X_SINC1] =    171;
+  table32[ADS126X_RATE_100][ADS126X_SINC2] =    191;
+  table32[ADS126X_RATE_100][ADS126X_SINC3] =    211;
+  table32[ADS126X_RATE_100][ADS126X_SINC4] =    231;
+  table32[ADS126X_RATE_400][ADS126X_SINC1] =    44;
+  table32[ADS126X_RATE_400][ADS126X_SINC2] =    49;
+  table32[ADS126X_RATE_400][ADS126X_SINC3] =    54;
+  table32[ADS126X_RATE_400][ADS126X_SINC4] =    59;
+  table32[ADS126X_RATE_1200][ADS126X_SINC1] =   15;
+  table32[ADS126X_RATE_1200][ADS126X_SINC2] =   17;
+  table32[ADS126X_RATE_1200][ADS126X_SINC3] =   19;
+  table32[ADS126X_RATE_1200][ADS126X_SINC4] =   21;
+  table32[ADS126X_RATE_2400][ADS126X_SINC1] =   8;
+  table32[ADS126X_RATE_2400][ADS126X_SINC2] =   9;
+  table32[ADS126X_RATE_2400][ADS126X_SINC3] =   10;
+  table32[ADS126X_RATE_2400][ADS126X_SINC4] =   11;
+  table32[ADS126X_RATE_4800][ADS126X_SINC1] =   5;
+  table32[ADS126X_RATE_4800][ADS126X_SINC2] =   5;
+  table32[ADS126X_RATE_4800][ADS126X_SINC3] =   6;
+  table32[ADS126X_RATE_4800][ADS126X_SINC4] =   6;
+  table32[ADS126X_RATE_7200][ADS126X_SINC1] =   4;
+  table32[ADS126X_RATE_7200][ADS126X_SINC2] =   4;
+  table32[ADS126X_RATE_7200][ADS126X_SINC3] =   4;
+  table32[ADS126X_RATE_7200][ADS126X_SINC4] =   5;
+  table32[ADS126X_RATE_14400][FIL_DONT_CARE] =  2;
+  table32[ADS126X_RATE_19200][FIL_DONT_CARE] =  2;
+  table32[ADS126X_RATE_38400][FIL_DONT_CARE] =  1;
+  return table32;
+}
+sps_map_t ADS126X::getTable33() {
+  sps_map_t table33;
+  table33[ADS126X_RATE_10][FIL_DONT_CARE] =     1742;
+  table33[ADS126X_RATE_100][FIL_DONT_CARE] =    212;
+  table33[ADS126X_RATE_400][FIL_DONT_CARE] =    55;
+  table33[ADS126X_RATE_1200][FIL_DONT_CARE] =   29;
+  return table33;
+}
+
+// Function to find the delay time, zero return indicates not found
+uint16_t ADS126X::findDelayTime(sps_map_t& table, uint8_t sps, uint8_t fil_type) {
+  // Search for the SPS key
+  auto sps_itr = table.find(sps);
+  if (sps_itr != table.end()) {
+      // SPS key found, now search for the FIL_TYPE key
+      auto& fil_type_map = sps_itr->second;
+      auto fil_type_itr = fil_type_map.find(fil_type);
+      if (fil_type_itr != fil_type_map.end()) {
+          // FIL_TYPE key found, return the corresponding delay time
+          return fil_type_itr->second;
+      } else {
+          // Check for "don't care" condition
+          auto dont_care_itr = fil_type_map.find(FIL_DONT_CARE);
+          if (dont_care_itr != fil_type_map.end()) {
+              // "Don't care" condition found, return the corresponding value
+              return dont_care_itr->second;
+          } else {
+            return 0; // return 0 if the combination is not found
+          }
+      }
+  }
+
+  // Return some default value (e.g., 0) if the combination is not found
+  return 0;
 }
 
 void ADS126X::readRegisters(uint8_t start_reg,uint8_t num) { // page 86

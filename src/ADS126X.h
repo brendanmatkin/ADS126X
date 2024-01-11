@@ -9,7 +9,14 @@ This is a class to use the TI ADS1262 and ADS1263 analog converters with an Ardu
 #define ADS126X_H
 
 #include <stdint.h>
+#include <map>
 #include "definitions/ADS126X_definitions.h"
+
+#define ADS126X_PRE_CAL_WAIT_TIME 100
+#define FIL_DONT_CARE 255 // unique value
+typedef std::map<uint8_t, uint16_t> filter_type_map_t;
+typedef std::map<uint8_t, filter_type_map_t> sps_map_t;
+
 
 class ADS126X {
   public:
@@ -33,6 +40,8 @@ class ADS126X {
     int32_t readADC1(void);
     int32_t readADC2(void);
     // Calibration Functions
+    void resetCalRegs1(void);
+    void resetCalRegs2(void);
     void calibrateSysOffsetADC1(uint8_t shorted1,uint8_t shorted2);
     void calibrateGainADC1(uint8_t vcc_pin,uint8_t gnd_pin);
     void calibrateSelfOffsetADC1(void);
@@ -78,6 +87,7 @@ class ADS126X {
     void setPulseMode(void);
     void setChopMode(uint8_t mode);
     void setDelay(uint8_t del);
+    void setRefReversal(uint8_t refrev);
 
     // MODE1 functions
     void setFilter(uint8_t filter);
@@ -91,8 +101,30 @@ class ADS126X {
     void setGain(uint8_t gain);
     uint8_t getGain(void);
     void setRate(uint8_t rate);
+    uint8_t getRate(void);
+
+    // TDAC functions
+    void setTdacpMag(uint8_t);
+    void setTdacnMag(uint8_t);
+    void setTdacpState(uint8_t);
+    void setTdacnState(uint8_t);
+    uint8_t getTdacpMag();
+    uint8_t getTdacnMag();
+    uint8_t getTdacpState();
+    uint8_t getTdacnState();
+
+    // ADC2CFG functions
+    void setGain2(uint8_t gain);
+    uint8_t getGain2();
+    void setReference2(uint8_t adc2RefConfig);
+    uint8_t getReference2();
+    void setRate2(uint8_t rate);
+    uint8_t getRate2();
+
 
     void setReference(uint8_t negativeReference, uint8_t positiveReference);
+    uint8_t getRefMuxN(void);
+    uint8_t getRefMuxP(void);
 
     // GPIO functions
     void gpioConnect(uint8_t pin);
@@ -121,6 +153,7 @@ class ADS126X {
     uint8_t CHECKSUM;
 
     void sendCommand(uint8_t command); // sends a single command
+    void sendCalCommand(uint8_t command, uint16_t wait_time); // send system calibration command with wait time
     void readRegisters(uint8_t start_reg,uint8_t num);
     void writeRegisters(uint8_t start_reg,uint8_t num);
     uint8_t readRegister(uint8_t reg);
@@ -130,6 +163,18 @@ class ADS126X {
     uint8_t find_checksum(uint32_t val,uint8_t byt);
     uint8_t find_crc(uint32_t val,uint8_t byt);
     uint8_t msb_pos(uint64_t val); // returns the position of most significant bit
+
+    // delay related
+    sps_map_t getTable32(void);
+    sps_map_t getTable33(void);
+    uint16_t findDelayTime(sps_map_t& table, uint8_t sps, uint8_t fil_type);
+    uint16_t getCalTime1(void); // see Table 32
+    uint16_t getCalTime2(void); // see Table 33
+    uint16_t cal2Time, sysCalTime2;
+    sps_map_t table32, table33;
+    uint8_t getSPS(void);
+    uint8_t getSPS2(void);
+    uint8_t getFIL(void);
 };
 
 #endif // define ADS126X_H
